@@ -350,19 +350,34 @@ def view_bill_pdf(
     bill_id: int,
     db: Session = Depends(get_db)
 ):
-    bill = db.query(models.Bill).filter(models.Bill.id == bill_id).first()
+    # 1️⃣ Fetch bill
+    bill = (
+        db.query(models.Bill)
+        .filter(models.Bill.id == bill_id)
+        .first()
+    )
     if not bill:
         raise HTTPException(status_code=404, detail="Bill not found")
+
     if bill.status != models.BillStatus.FINALIZED:
         raise HTTPException(
             status_code=400,
             detail="Bill must be finalized before viewing PDF"
         )
 
-    customer = db.query(models.Customer).filter(
-        models.Customer.id == bill.customer_id
-    ).first()
+    # 2️⃣ Fetch customer
+    customer = (
+        db.query(models.Customer)
+        .filter(models.Customer.id == bill.customer_id)
+        .first()
+    )
+    if not customer:
+        raise HTTPException(
+            status_code=404,
+            detail="Customer not found"
+        )
 
+    # 3️⃣ Fetch bill items
     items = (
         db.query(models.BillItem)
         .filter(models.BillItem.bill_id == bill_id)
@@ -370,13 +385,17 @@ def view_bill_pdf(
     )
 
     if not items:
-        print("⚠️ WARNING: No items found for bill", bill_id)
+        raise HTTPException(
+            status_code=400,
+            detail="No items found for this bill"
+        )
 
-    # Use stored values from bill (do not recalculate GST)
+    # 4️⃣ Use STORED values (never recalculate)
     subtotal = bill.subtotal
     gst_amount = bill.gst_amount
     grand_total = bill.total_amount
 
+    # 5️⃣ Generate PDF
     pdf_path = generate_bill_pdf(
         bill=bill,
         customer=customer,
@@ -386,11 +405,13 @@ def view_bill_pdf(
         grand_total=grand_total
     )
 
+    # 6️⃣ Return PDF inline (browser view)
     return FileResponse(
         path=pdf_path,
         media_type="application/pdf",
+        filename=f"bill_{bill_id}.pdf",
         headers={
-            "Content-Disposition": f"inline; filename=bill_{bill_id}.pdf"
+            "Content-Disposition": f'inline; filename="bill_{bill_id}.pdf"'
         }
     )
 
