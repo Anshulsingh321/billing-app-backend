@@ -342,6 +342,7 @@ def adjust_bill(
         "message": "Bill adjusted successfully"
     }
 
+
 # -------------------------
 # VIEW BILL PDF (INLINE)
 # -------------------------
