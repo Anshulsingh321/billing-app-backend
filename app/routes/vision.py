@@ -19,21 +19,21 @@ router = APIRouter(prefix="/vision", tags=["Vision"])
 @router.post("/health")
 def vision_health():
     return {"status": "Vision route working"}
-# Initialize Google Vision client (Railway-safe)
-# Supports GOOGLE_APPLICATION_CREDENTIALS_JSON (recommended for cloud)
+# Initialize Google Vision client (Railway-safe, no ADC)
+from google.oauth2 import service_account
+
 init_error = None
 vision_client = None
 
 try:
     credentials_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
-    if credentials_json:
-        temp_cred_file = tempfile.NamedTemporaryFile(delete=False, suffix=".json")
-        temp_cred_file.write(credentials_json.encode("utf-8"))
-        temp_cred_file.flush()
-        temp_cred_file.close()
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = temp_cred_file.name
+    if not credentials_json:
+        raise RuntimeError("GOOGLE_APPLICATION_CREDENTIALS_JSON not set")
 
-    vision_client = vision.ImageAnnotatorClient()
+    credentials_info = json.loads(credentials_json)
+    credentials = service_account.Credentials.from_service_account_info(credentials_info)
+
+    vision_client = vision.ImageAnnotatorClient(credentials=credentials)
 
 except Exception as e:
     init_error = str(e)
