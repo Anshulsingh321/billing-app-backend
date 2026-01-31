@@ -691,10 +691,10 @@ def send_bill_whatsapp(
 
     text_part = (
     f"Hello {customer.name if customer else ''},\n\n"
-    f"Your bill is ready\n"
+    f"🧾 Your bill is ready\n"
     f"Bill No: {bill.invoice_number}\n"
     f"Amount: ₹{bill.total_amount}\n\n"
-    f"View bill PDF:\n"
+    f"📄 View bill PDF:\n"
     )
 
     encoded_text = urllib.parse.quote(text_part)
