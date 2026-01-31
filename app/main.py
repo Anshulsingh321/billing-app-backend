@@ -17,7 +17,20 @@ app.include_router(bills.router)
 app.include_router(item_master.router)
 app.include_router(voice.router)
 app.include_router(reports.router)
+
 app.include_router(vision_router)
+
+# -------------------------------------------------
+# Global Health Check
+# -------------------------------------------------
+@app.get("/health")
+def health_check():
+    return {
+        "status": "ok",
+        "services": {
+            "api": "ok"
+        }
+    }
 
 # Create DB tables
 Base.metadata.create_all(bind=engine)
