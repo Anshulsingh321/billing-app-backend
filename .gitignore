@@ -11,3 +11,10 @@ venv/
 
 # Environment variables
 .env
+
+# Secrets
+vision-key.json
+
+# Generated files
+generated/
+pdfs/
