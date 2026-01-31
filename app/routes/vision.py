@@ -1,5 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from google.cloud import vision
+import json
+import tempfile
 import os
 import io
 from typing import List
@@ -17,13 +19,25 @@ router = APIRouter(prefix="/vision", tags=["Vision"])
 @router.post("/health")
 def vision_health():
     return {"status": "Vision route working"}
-# Initialize Google Vision client
-# Uses GOOGLE_APPLICATION_CREDENTIALS env var
+# Initialize Google Vision client (Railway-safe)
+# Supports GOOGLE_APPLICATION_CREDENTIALS_JSON (recommended for cloud)
+init_error = None
+vision_client = None
+
 try:
+    credentials_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+    if credentials_json:
+        temp_cred_file = tempfile.NamedTemporaryFile(delete=False, suffix=".json")
+        temp_cred_file.write(credentials_json.encode("utf-8"))
+        temp_cred_file.flush()
+        temp_cred_file.close()
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = temp_cred_file.name
+
     vision_client = vision.ImageAnnotatorClient()
+
 except Exception as e:
-    vision_client = None
     init_error = str(e)
+    vision_client = None
 
 # Initialize Gemini client
 GEMINI_MODEL = "gemini-3-flash-preview"
