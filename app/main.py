@@ -1,20 +1,26 @@
-from dotenv import load_dotenv
-import os
-
-# Load environment variables from .env
-load_dotenv()
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from .database import Base, engine
 from .routes import customers, bills, voice, item_master, reports
+from app.routes.vision import router as vision_router
 
-# Create all database tables
-Base.metadata.create_all(bind=engine)
-
-# Initialize FastAPI app
+# Create app 
 app = FastAPI(title="Shop Billing MVP")
+
+# include routers
+app.include_router(customers.router)
+app.include_router(bills.router)
+app.include_router(item_master.router)
+app.include_router(voice.router)
+app.include_router(reports.router)
+app.include_router(vision_router)
+
+# Create DB tables
+Base.metadata.create_all(bind=engine)
 
 # -------------------------------------------------
 # Middleware: ngrok / browser warning bypass

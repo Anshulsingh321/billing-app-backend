@@ -3,6 +3,9 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime
+from pydantic import BaseModel
+import urllib.parse
+import os
 
 # --- Invoice numbering helpers ---
 def generate_invoice_number(db):
@@ -47,6 +50,10 @@ GST_RATE = 0.18
 class BillAdjustmentCreate(schemas.BaseModel):
     amount: float
     reason: str | None = None
+
+# WhatsApp send schema
+class WhatsAppSendRequest(BaseModel):
+    phone: str
 
 router = APIRouter(
     prefix="/bills",
@@ -167,9 +174,13 @@ def add_bill_item(
 # -------------------------
 # FINALIZE BILL
 # -------------------------
+from typing import Annotated
+from fastapi import Body
+
 @router.post("/{bill_id}/finalize")
 def finalize_bill(
     bill_id: int,
+    phone: Annotated[str | None, Body()] = None,
     db: Session = Depends(get_db)
 ):
     bill = db.query(models.Bill).filter(models.Bill.id == bill_id).first()
@@ -219,7 +230,26 @@ def finalize_bill(
     db.commit()
     db.refresh(bill)
 
-    return {
+    # WhatsApp link logic (copied from send_bill_whatsapp)
+    whatsapp_url = None
+    if phone:
+        customer = db.query(models.Customer).filter(
+            models.Customer.id == bill.customer_id
+        ).first()
+        BASE_URL = os.getenv("BASE_URL", "http://127.0.0.1:8000")
+        pdf_url = f"{BASE_URL}/bills/{bill_id}/pdf"
+        message = (
+            f"Hello {customer.name if customer else ''},\n\n"
+            f"🧾 Your bill is ready\n"
+            f"Bill No: {bill.invoice_number}\n"
+            f"Amount: ₹{bill.total_amount}\n\n"
+            f"📄 View bill PDF:\n"
+            f"{pdf_url}"
+        )
+        encoded_message = urllib.parse.quote(message)
+        whatsapp_url = f"https://wa.me/{phone}?text={encoded_message}"
+
+    response = {
         "bill_id": bill.id,
         "status": bill.status,
         "subtotal": subtotal,
@@ -227,6 +257,9 @@ def finalize_bill(
         "total_amount": bill.total_amount,
         "message": "Bill finalized successfully"
     }
+    if whatsapp_url:
+        response["whatsapp_url"] = whatsapp_url
+    return response
 
 # -------------------------
 # PAY BILL
@@ -619,3 +652,48 @@ def monthly_summary(
         "NON_GST": summarize(models.BillType.NON_GST),
         "UDHAR": summarize(models.BillType.UDHAR),
     }
+
+
+# -------------------------
+# SEND BILL VIA WHATSAPP
+# -------------------------
+@router.post("/{bill_id}/send-whatsapp")
+def send_bill_whatsapp(
+    bill_id: int,
+    payload: WhatsAppSendRequest,
+    db: Session = Depends(get_db)
+):
+    bill = db.query(models.Bill).filter(models.Bill.id == bill_id).first()
+    if not bill:
+        raise HTTPException(status_code=404, detail="Bill not found")
+
+    if bill.status != models.BillStatus.FINALIZED:
+        raise HTTPException(
+            status_code=400,
+            detail="Bill must be finalized before sending on WhatsApp"
+        )
+
+    customer = db.query(models.Customer).filter(
+        models.Customer.id == bill.customer_id
+    ).first()
+
+    BASE_URL = os.getenv("BASE_URL", "http://127.0.0.1:8000")
+    pdf_url = f"{BASE_URL}/bills/{bill_id}/pdf"
+
+    message = (
+        f"Hello {customer.name if customer else ''},\n\n"
+        f"🧾 Your bill is ready\n"
+        f"Bill No: {bill.invoice_number}\n"
+        f"Amount: ₹{bill.total_amount}\n\n"
+        f"📄 View bill PDF:\n"
+        f"{pdf_url}"
+    )
+
+    encoded_message = urllib.parse.quote(message)
+    whatsapp_url = f"https://wa.me/{payload.phone}?text={encoded_message}"
+
+    return {
+        "status": "success",
+        "whatsapp_url": whatsapp_url
+    }
+

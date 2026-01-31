@@ -24,3 +24,14 @@ class BillPaymentCreate(BaseModel):
 class BillAdjustmentCreate(BaseModel):
     amount: float   # +ve = charge, -ve = return
     reason: str | None = None
+
+class BillCorrectionRequest(BaseModel):
+    bill_id: int
+    command: str
+
+class VoiceCorrectionRequest(BaseModel):
+    bill_id: int
+    command: str
+
+class VisionTextNormalizeRequest(BaseModel):
+    lines: List[str]
